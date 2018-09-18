@@ -21,180 +21,198 @@
 
 namespace mirtk {
 
-HashProbabilisticAtlas::HashProbabilisticAtlas(){
-	_number_of_voxels = 0;
-	_number_of_maps = 0;
-	_position = 0;
-	_has_background = false;
-	_segmentation = NULL;
+HashProbabilisticAtlas::HashProbabilisticAtlas()
+{
+  _number_of_voxels = 0;
+  _number_of_maps = 0;
+  _position = 0;
+  _has_background = false;
+  _segmentation = nullptr;
 }
 
-HashProbabilisticAtlas::~HashProbabilisticAtlas(){
-	if (_segmentation) delete _segmentation;
-	for(int i=0; i<_images.size(); i++) delete _images[i];
+HashProbabilisticAtlas::~HashProbabilisticAtlas()
+{
+  if (_segmentation) delete _segmentation;
+  for (int i=0; i<_images.size(); i++) delete _images[i];
 }
 
 HashProbabilisticAtlas& HashProbabilisticAtlas::operator=(const HashProbabilisticAtlas &atlas)
 {
   if (this != &atlas) {
-	if (_segmentation) delete _segmentation;
-	for(int i=0; i<_images.size(); i++) delete _images[i];
-	int N=atlas.GetNumberOfMaps();
-	for(int i=0; i<N; i++) AddImage(atlas.GetImage(i));
-	_has_background = atlas.HasBackground();
+  if (_segmentation) delete _segmentation;
+  for (int i=0; i<_images.size(); i++) delete _images[i];
+  auto N = atlas.GetNumberOfMaps();
+  for (int i=0; i<N; i++) AddImage(atlas.GetImage(i));
+    _has_background = atlas.HasBackground();
   }
   return *this;
 }
 
-void HashProbabilisticAtlas::SwapImages(int a, int b){
-	if( a >= _number_of_maps || b >= _number_of_maps ){
-		std::cerr << "cannot swap images, index out of bounds!" << std::endl;
-		return;
-	}
-	HashRealImage *tmpimage = _images[a];
-	_images[a] = _images[b];
-	_images[b] = tmpimage;
+void HashProbabilisticAtlas::SwapImages(int a, int b)
+{
+  if( a >= _number_of_maps || b >= _number_of_maps ){
+    std::cerr << "cannot swap images, index out of bounds!" << std::endl;
+    return;
+  }
+  HashRealImage *tmpimage = _images[a];
+  _images[a] = _images[b];
+  _images[b] = tmpimage;
 }
 
 template <class ImageType>
-void HashProbabilisticAtlas::AddImage(ImageType image){
-	if (_images.size() == 0) {
-		_number_of_voxels = image.GetNumberOfVoxels();
-	} else {
-		if (_number_of_voxels != image.GetNumberOfVoxels()) {
-			std::cerr << "Image sizes mismatch" << std::endl;
-			exit(1);
-		}
-	}
-	_images.push_back(new HashRealImage(image));
-	if(_has_background) SwapImages(_images.size()-2, _images.size()-1);
-	_number_of_maps = _images.size();
+void HashProbabilisticAtlas::AddImage(ImageType image)
+{
+  if (_images.size() == 0) {
+    _number_of_voxels = image.GetNumberOfVoxels();
+  } else {
+    if (_number_of_voxels != image.GetNumberOfVoxels()) {
+      std::cerr << "Image sizes mismatch" << std::endl;
+      exit(1);
+    }
+  }
+  _images.push_back(new HashRealImage(image));
+  if(_has_background) SwapImages(_images.size()-2, _images.size()-1);
+  _number_of_maps = _images.size();
 
 }
 
-void HashProbabilisticAtlas::NormalizeAtlas(){
-	int i, j;
+void HashProbabilisticAtlas::NormalizeAtlas()
+{
+  int i, j;
 
-	// Add extra image
-	if (_number_of_maps == 0) {
-		std::cerr << "HashProbabilisticAtlas::NormalizeAtlas: No probability maps found" << std::endl;
-		exit(1);
-	} 
+  // Add extra image
+  if (_number_of_maps == 0) {
+    std::cerr << "HashProbabilisticAtlas::NormalizeAtlas: No probability maps found" << std::endl;
+    exit(1);
+  }
 
-	// normalize atlas to 0 to 1
-	this->First();
-	RealPixel norm;
-	RealPixel values[_number_of_maps];
-	for (i = 0; i < _number_of_voxels; i++) {
-		norm = 0;
-		for (j = 0; j < _number_of_maps; j++) {
-			values[j]= _images[j]->Get(i);
-			if(values[j]<0){
-				_images[j]->Put(i, 0);
-				values[j]=0;
-			}else norm += values[j];
-		}
-		if (norm>0) {
-			for (j = 0; j < _number_of_maps; j++)
-				_images[j]->Put(i, values[j]/norm);
-		} else {
-			for (j = 0; j < _number_of_maps-1; j++)
-				_images[j]->Put(i, 0);
-			if(_has_background) _images[_number_of_maps-1]->Put(i, 1);
-		}
-		this->Next();
-	}
+  // normalize atlas to 0 to 1
+  this->First();
+  RealPixel norm;
+  RealPixel values[_number_of_maps];
+  for (i = 0; i < _number_of_voxels; i++) {
+    norm = 0;
+    for (j = 0; j < _number_of_maps; j++) {
+      values[j]= _images[j]->Get(i);
+      if(values[j]<0){
+        _images[j]->Put(i, 0);
+        values[j]=0;
+      }else norm += values[j];
+    }
+    if (norm>0) {
+      for (j = 0; j < _number_of_maps; j++)
+        _images[j]->Put(i, values[j]/norm);
+    } else {
+      for (j = 0; j < _number_of_maps-1; j++)
+        _images[j]->Put(i, 0);
+      if(_has_background) _images[_number_of_maps-1]->Put(i, 1);
+    }
+    this->Next();
+  }
 }
 
 
-void HashProbabilisticAtlas::AddBackground(){
-	int i, j;
-	// Add extra image
-	if (_number_of_maps == 0) {
-		std::cerr << "HashProbabilisticAtlas::AddBackground: No probability maps found" << std::endl;
-		exit(1);
-	} 
-	this->AddImage(*(_images[0]));
+void HashProbabilisticAtlas::AddBackground()
+{
+  int i, j;
+  // Add extra image
+  if (_number_of_maps == 0) {
+    std::cerr << "HashProbabilisticAtlas::AddBackground: No probability maps found" << std::endl;
+    exit(1);
+  }
+  this->AddImage(*(_images[0]));
 
-	// normalize atlas to 0 to 1
-	RealPixel norm, min, max, div, value;
-	RealPixel values[_number_of_maps];
+  // normalize atlas to 0 to 1
+  RealPixel norm, min, max, div, value;
+  RealPixel values[_number_of_maps];
 
-	HashRealImage *other;
-	other = _images[0];
-	for (i = 1; i < _number_of_maps-1; i++) {
-		(*other) += (*_images[i]);
-	}
-	other->GetMinMax(&min, &max);
-	div=(max - min);
+  HashRealImage *other;
+  other = _images[0];
+  for (i = 1; i < _number_of_maps-1; i++) {
+    (*other) += (*_images[i]);
+  }
+  other->GetMinMax(&min, &max);
+  div=(max - min);
 
-	this->First();
-	for (i = 0; i < _number_of_voxels; i++) {
-		norm = 0;
-		for (j = 0; j < _number_of_maps-1; j++) {
-			values[j]=(_images[j]->Get(i)- min) / div;
-			_images[j]->Put(i, values[j]);
-			norm += values[j];
-		}
-		value = 1 - norm;
-		if (value < 0) value = 0;
-		if (value > 1) value = 1;
-		 _images[_number_of_maps-1]->Put(i, value);
-		this->Next();
-	}
+  this->First();
+  for (i = 0; i < _number_of_voxels; i++) {
+    norm = 0;
+    for (j = 0; j < _number_of_maps-1; j++) {
+      values[j]=(_images[j]->Get(i)- min) / div;
+      _images[j]->Put(i, values[j]);
+      norm += values[j];
+    }
+    value = 1 - norm;
+    if (value < 0) value = 0;
+    if (value > 1) value = 1;
+     _images[_number_of_maps-1]->Put(i, value);
+    this->Next();
+  }
 
-	_has_background=true;
+  _has_background=true;
 }
 
 template <class ImageType>
-void HashProbabilisticAtlas::AddProbabilityMaps(int n, ImageType **atlas){
-	for (int i = 0; i < n; i++) {
-		this->AddImage(*(atlas[i]));
-	}
+void HashProbabilisticAtlas::AddProbabilityMaps(int n, ImageType **atlas)
+{
+  for (int i = 0; i < n; i++) {
+    this->AddImage(*(atlas[i]));
+  }
 }
 
-void HashProbabilisticAtlas::Write(int i, const char *filename){
-	if  (i < _number_of_maps) {
-		_images[i]->Write(filename);
-	} else {
-		std::cerr << "HashProbabilisticAtlas::Write: No such probability map" << std::endl;
-		exit(1);
-	}
+void HashProbabilisticAtlas::Write(int i, const char *filename)
+{
+  if  (i < _number_of_maps) {
+    _images[i]->Write(filename);
+  } else {
+    std::cerr << "HashProbabilisticAtlas::Write: No such probability map" << std::endl;
+    exit(1);
+  }
 }
 
-HashImage<int> HashProbabilisticAtlas::ComputeHardSegmentation(){
-	int i, mapnr, j = 0;
-    RealPixel max = 0;
+HashImage<int> HashProbabilisticAtlas::ComputeHardSegmentation()
+{
+  if (!_segmentation) {
+    _segmentation = new HashImage<int>(_images[0]->Attributes());
+  }
+  (*_segmentation) = -1;
 
-	if(!_segmentation) _segmentation = new HashImage<int>(_images[0]->Attributes());
-    (*_segmentation) = -1;
-
-	First();
-	for (i = 0; i < _number_of_voxels; i++) {
-		max = 0;
-		mapnr = -1;
-		for (j=0; j< GetNumberOfMaps(); j++) {
-			if (_images[j]->Get(i) > max) {
-				mapnr = j;
-				max = _images[j]->Get(i);
-			}
-        }
-		_segmentation->Put(i, mapnr);
-		Next();
-	}
-	return *_segmentation;
+  First();
+  for (int i = 0; i < _number_of_voxels; i++) {
+    auto max = RealPixel(0);
+    auto sum = RealPixel(0);
+    auto lbl = -1;
+    for (int j = 0; j< _number_of_maps; j++) {
+      auto prb = _images[j]->Get(i);
+      if (prb > max) {
+        lbl = j;
+        max = _images[j]->Get(i);
+      }
+      sum += prb;
+    }
+    if (_has_background || sum >= .5) {
+      _segmentation->Put(i, lbl);
+    } else {
+      for (int j = 0; j< _number_of_maps; j++) {
+        _images[j]->Put(j, 0);
+      }
+    }
+    Next();
+  }
+  return *_segmentation;
 }
 
-void HashProbabilisticAtlas::ExtractLabel(int label, HashByteImage& image){
-	if(!_segmentation) ComputeHardSegmentation();
-	for (int i = 0; i < _number_of_voxels; i++) {
-		if (_segmentation->Get(i) == label) image.Put(i, 1);
-		else image.Put(i, 0);
-	}
+void HashProbabilisticAtlas::ExtractLabel(int label, HashByteImage& image)
+{
+  if (!_segmentation) ComputeHardSegmentation();
+  for (int i = 0; i < _number_of_voxels; i++) {
+    image.Put(i, _segmentation->Get(i) == label ? 1 : 0);
+  }
 }
 
-void HashProbabilisticAtlas::WriteHardSegmentation(const char *filename){
-	_segmentation->Write(filename);
+void HashProbabilisticAtlas::WriteHardSegmentation(const char *filename)
+{
+  _segmentation->Write(filename);
 }
 
 
@@ -205,4 +223,4 @@ template void HashProbabilisticAtlas::AddProbabilityMaps(int, HashRealImage **at
 template void HashProbabilisticAtlas::AddBackground(RealImage image);
 template void HashProbabilisticAtlas::AddBackground(HashRealImage image);
 
-}
+} // namespace mirtk
